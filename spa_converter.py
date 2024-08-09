@@ -102,6 +102,7 @@ class SpaConverter:
                 # get the class id and the bounding box coordinates
                 class_id = self.names[designator]
 
+                # try to get the vertices, if not possible continue to the next row
                 try:
                     vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
                 except:
