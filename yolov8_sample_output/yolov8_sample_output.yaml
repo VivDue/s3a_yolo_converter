@@ -1,0 +1,9 @@
+
+# Paths
+path: yolov8_sample_output
+train: images/train
+val: images/val
+
+# Classes
+nc: 25
+names: [R, C, U, Q, J, L, RA, D, RN, TP, IC, P, CR, M, BTN, FB, CRA, SW, T, F, V, LED, S, QA, JP]
