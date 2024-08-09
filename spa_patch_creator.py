@@ -91,6 +91,8 @@ class SpaPatchCreator:
         image = cv2.imread(img_path)
         height, width, _ = image.shape
 
+        
+        patch_counter = 0
         # iterate over width and height of the image and extract patches
         for i in range(0, height, patch_size):
             for j in range(0, width, patch_size):
@@ -101,9 +103,7 @@ class SpaPatchCreator:
                 if j + patch_size > width:
                     j = width - patch_size
 
-
-                drop_list = []
-                new_vertices = []
+                new_rows = []
                 # iterate over the rows of the annotation and extract patches
                 for idx, row in df.iterrows():
                     # try to get the vertices, if not possible continue to the next row
@@ -111,21 +111,19 @@ class SpaPatchCreator:
                     try:
                         vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
                     except:
-                        drop_list.append(idx)
                         continue
 
                     # check if any x and y coordinates are inside the corresponding patch boundaries
-                    x_bool = self._check_range(vertices[::2], i, i + patch_size)
-                    y_bool = self._check_range(vertices[1::2], j, j + patch_size)
+                    x_bool = self._check_range(vertices[::2], j, j + patch_size)
+                    y_bool = self._check_range(vertices[1::2], i, i + patch_size)
                     
                     if not x_bool and not y_bool:
                         # delete current row if not all coordinates are inside the patch boundaries
-                        drop_list.append(idx)
                         continue
 
                     # set new vertices coordinates correspnding to the new patch size
                     # if the coordinates are outside the patch boundaries, set them to 0 or patch_size
-                    
+                    new_vertices = []
                     for idx, vertex in enumerate(vertices):
                         if idx % 2 == 0:
                             if vertex < i:
@@ -133,25 +131,29 @@ class SpaPatchCreator:
                             elif vertex > i + patch_size:
                                 new_vertices.append(patch_size)
                             else:
-                                new_vertices.append(vertex - i)
+                                new_vertices.append(int(vertex - i))
                         else:
                             if vertex < j:
                                 new_vertices.append(0)
                             elif vertex > j + patch_size:
                                 new_vertices.append(patch_size)
                             else:
-                                new_vertices.append(vertex - j)
+                                new_vertices.append(int(vertex - j))
 
-                # drop the rows from the dataframe
-                df.drop(drop_list, inplace=True)
-
-                # update the vertices in the dataframe
-                #new_vertices = np.array(new_vertices).reshape(-1, 2).tolist()
-                new_vertices = [[1,2],[2,3]]
-                df.at[idx, "Vertices"] = str([new_vertices])
                 
+
+                    # update the vertices in the dataframe
+                    new_vertices = np.array(new_vertices).reshape(-1, 2).tolist()
+                    row["Vertices"] = str([new_vertices])
+                    file_name = image_name.split(".")[0]
+                    row["Image File"] = f"{file_name}_{str(patch_counter)}.png"
+                    new_rows.append(row)
+
+                patch_counter = patch_counter + 1
                 # append the new annotation to the patches list
-                patches.append(df)
+                temp_df = pd.DataFrame(new_rows)
+                temp_df.columns = df.columns
+                patches.append(temp_df)
         
         # split extension from the annotation name
         annotation_file = os.path.basename(annotation_path)
