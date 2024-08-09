@@ -85,7 +85,7 @@ class SpaConverter:
         :param df: pandas dataframe containing the annotations.
         :param file_name: name of the file.
         """
-        # exhanging the file extension
+        # exchanging the file extension
         file_name = image_name.split(".")[0]
         file_name = file_name + ".txt"
 
@@ -101,7 +101,11 @@ class SpaConverter:
 
                 # get the class id and the bounding box coordinates
                 class_id = self.names[designator]
-                vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
+
+                try:
+                    vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
+                except:
+                    continue
 
                 # write the class id and the bounding box coordinates to the file
                 f.write(f"{class_id}")
