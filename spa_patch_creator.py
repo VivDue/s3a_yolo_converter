@@ -103,21 +103,28 @@ class SpaPatchCreator:
                 if j + patch_size > width:
                     j = width - patch_size
 
+                # drop rows with designator NaN
+                df = df.dropna(subset=["Designator"])
+
                 new_rows = []
                 # iterate over the rows of the annotation and extract patches
                 for idx, row in df.iterrows():
                     # try to get the vertices, if not possible continue to the next row
-                    
                     try:
                         vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
                     except:
                         continue
 
+                    # skip row if designation is not present
+                    designator = row["Designator"]
+                    if designator is 'nan':
+                        continue
+
                     # check if any x and y coordinates are inside the corresponding patch boundaries
-                    x_bool = self._check_range(vertices[::2], j, j + patch_size)
+                    x_bool = self._check_range(vertices[0::2], j, j + patch_size)
                     y_bool = self._check_range(vertices[1::2], i, i + patch_size)
                     
-                    if not x_bool and not y_bool:
+                    if not x_bool or not y_bool:
                         # delete current row if not all coordinates are inside the patch boundaries
                         continue
 
@@ -126,24 +133,26 @@ class SpaPatchCreator:
                     new_vertices = []
                     for idx, vertex in enumerate(vertices):
                         if idx % 2 == 0:
-                            if vertex < i:
-                                new_vertices.append(0)
-                            elif vertex > i + patch_size:
-                                new_vertices.append(patch_size)
-                            else:
-                                new_vertices.append(int(vertex - i))
-                        else:
                             if vertex < j:
                                 new_vertices.append(0)
-                            elif vertex > j + patch_size:
-                                new_vertices.append(patch_size)
+                            elif vertex > (j + patch_size):
+                                new_vertices.append(patch_size-1)
                             else:
                                 new_vertices.append(int(vertex - j))
-
-                
+                        else:
+                            if vertex < i:
+                                new_vertices.append(0)
+                            elif vertex > (i + patch_size):
+                                new_vertices.append(patch_size-1)
+                            else:
+                                new_vertices.append(int(vertex - i))
 
                     # update the vertices in the dataframe
-                    new_vertices = np.array(new_vertices).reshape(-1, 2).tolist()
+                    new_vertices = np.array(new_vertices).reshape(-1, 2)
+                    # remove duplicates from the list
+                    _, idx = np.unique(new_vertices, axis=0, return_index=True)
+                    new_vertices = new_vertices[np.sort(idx)].tolist()
+                    
                     row["Vertices"] = str([new_vertices])
                     file_name = image_name.split(".")[0]
                     row["Image File"] = f"{file_name}_{str(patch_counter)}.png"
@@ -172,7 +181,7 @@ class SpaPatchCreator:
 
         :return: True if any values is in the range, False otherwise.
         """
-        required_values = np.arange(min_value, max_value + 1)
+        required_values = np.arange(min_value, max_value)
         
         # check if any of required values are in the array
         return bool(np.any(np.isin(arr, required_values)))
