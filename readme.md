@@ -1,7 +1,3 @@
-Sure! Here's the README file in English:
-
----
-
 # S3A to YOLOv8 Converter
 
 This project is designed to convert the proprietary S3A format used for the FPIC dataset into the YOLOv8 format, enabling the training of object detection and segmentation algorithms using the YOLOv8 file format.
