@@ -48,8 +48,9 @@ class SpaPatchCreator:
                 pbar.update(1)
         
 
-    def _split_image(self, image_name:str, patch_size:int):
+    def _split_image(self, image_name:str, patch_size:int)->None:
         """Split the image into patches.
+
         :param image_path: path to the image.
         :param patch_size: size of the patches in Pixels.
         """
@@ -78,117 +79,148 @@ class SpaPatchCreator:
         for i, patch in enumerate(patches):
             cv2.imwrite(f'{self.output_dir}/img/{image_name}_{str(i)}.png', patch)
     
-    def _split_annotation(self, annotation_path:str, patch_size:int):
+    def _split_annotation(self, annotation_path:str, patch_size:int)->None:
         """Split the annotation into patches.
-        :param annotation_path: path to the annotation.
+
+        :param annotation_path: path to the annotation file.
         :param patch_size: size of the patches in Pixels.
         """
         df = pd.read_csv(annotation_path)
-        patches = []
-
         image_name = df["Image File"].unique()[0]
         img_path = f"{self.image_dir}/{image_name}"
         image = cv2.imread(img_path)
         height, width, _ = image.shape
 
-        
         patch_counter = 0
-        # iterate over width and height of the image and extract patches
         for i in range(0, height, patch_size):
             for j in range(0, width, patch_size):
-                # check if the extracted image is smaller than patch size
-                # and move the starting x and y point to match the given patch size
                 if i + patch_size > height:
                     i = height - patch_size
                 if j + patch_size > width:
                     j = width - patch_size
 
-                # drop rows with designator NaN
-                df = df.dropna(subset=["Designator"])
-
+                # Filter and process rows for the current patch
                 new_rows = []
-                # iterate over the rows of the annotation and extract patches
-                for idx, row in df.iterrows():
-                    # try to get the vertices, if not possible continue to the next row
-                    try:
-                        vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
-                    except:
-                        continue
+                for _, row in df.iterrows():
+                    new_row = self._process_row(row, i, j, patch_size, patch_counter)
+                    if new_row is not None:
+                        new_rows.append(new_row)
+                
+                # Create patch annotation file
+                self._create_patch_annotation(new_rows, df.columns, annotation_path, patch_counter)
+                patch_counter += 1
 
-                    # skip row if designation is not present
-                    designator = row["Designator"]
-                    if designator is 'nan':
-                        continue
+    def _process_row(self, row:pd.Series, i:int, j:int, patch_size:int, patch_counter:int)->pd.Series:
+        """
+        Process each annotation row to check if it fits in the current patch and adjust coordinates.
 
-                    # check if any x and y coordinates are inside the corresponding patch boundaries
-                    x_bool = self._check_range(vertices[0::2], j, j + patch_size)
-                    y_bool = self._check_range(vertices[1::2], i, i + patch_size)
-                    
-                    if not x_bool or not y_bool:
-                        # delete current row if not all coordinates are inside the patch boundaries
-                        continue
+        :param row: A row from the annotation DataFrame.
+        :param i: Current vertical (y-axis) starting position of the patch.
+        :param j: Current horizontal (x-axis) starting position of the patch.
+        :param patch_size: Size of the patches in pixels.
+        :param patch_counter: Index for the current patch.
+        :return: The modified row if it fits in the patch, otherwise None.
+        """
+        try:
+            vertices = self._get_valid_vertices(row)
+        except ValueError:
+            return None  # Skip rows with invalid vertices
 
-                    # set new vertices coordinates correspnding to the new patch size
-                    # if the coordinates are outside the patch boundaries, set them to 0 or patch_size
-                    new_vertices = []
-                    for idx, vertex in enumerate(vertices):
-                        if idx % 2 == 0:
-                            if vertex < j:
-                                new_vertices.append(0)
-                            elif vertex > (j + patch_size):
-                                new_vertices.append(patch_size-1)
-                            else:
-                                new_vertices.append(int(vertex - j))
-                        else:
-                            if vertex < i:
-                                new_vertices.append(0)
-                            elif vertex > (i + patch_size):
-                                new_vertices.append(patch_size-1)
-                            else:
-                                new_vertices.append(int(vertex - i))
+        if vertices is None:
+            return None  # Skip rows without valid designators
 
-                    # update the vertices in the dataframe
-                    new_vertices = np.array(new_vertices).reshape(-1, 2)
-                    # remove duplicates from the list
-                    _, idx = np.unique(new_vertices, axis=0, return_index=True)
-                    new_vertices = new_vertices[np.sort(idx)].tolist()
-                    
-                    row["Vertices"] = str([new_vertices])
-                    file_name = image_name.split(".")[0]
-                    row["Image File"] = f"{file_name}_{str(patch_counter)}.png"
-                    new_rows.append(row)
+        x_bool = self._check_range(vertices[0::2], j, j + patch_size)
+        y_bool = self._check_range(vertices[1::2], i, i + patch_size)
+        if not x_bool or not y_bool:
+            return None  # Skip if coordinates are not within the patch boundaries
 
-                patch_counter = patch_counter + 1
-                # append the new annotation to the patches list
-                temp_df = pd.DataFrame(new_rows)
-                temp_df.columns = df.columns
-                patches.append(temp_df)
+        new_vertices = self._adjust_patch_boundaries(vertices, i, j, patch_size)
         
-        # split extension from the annotation name
-        annotation_file = os.path.basename(annotation_path)
-        annotation_name = annotation_file.split(".")[1]
+        row["Vertices"] = str([new_vertices])
+        row["Image File"] = f"{row['Image File'].split('.')[0]}_{patch_counter}.png"
+        return row
 
-        # write patches to the output directory
-        for i, patch in enumerate(patches):
-            patch.to_csv(f'{self.output_dir}/ann/{annotation_name}_{str(i)}.csv', index=False)
+    def _get_valid_vertices(self, row:pd.Series)->np.ndarray:
+        """
+        Extract and validate vertices from the annotation row.
+
+        :param row: A row from the annotation DataFrame.
+        :return: A flattened NumPy array of vertices if valid, otherwise None.
+        """
+        try:
+            vertices = np.array(ast.literal_eval(row["Vertices"]))[0].flatten()
+            if pd.isna(row["Designator"]):
+                return None
+            return vertices
+        except (ValueError, IndexError):
+            return None  # Handle cases where vertices can't be parsed
+
+    def _adjust_patch_boundaries(self, vertices:np.ndarray, i:int, j:int, patch_size:int)->list:
+        """
+        Adjust the vertices to fit within the patch boundaries.
+
+        :param vertices: NumPy array of vertex coordinates.
+        :param i: Current vertical (y-axis) starting position of the patch.
+        :param j: Current horizontal (x-axis) starting position of the patch.
+        :param patch_size: Size of the patches in pixels.
+        :return: List of adjusted vertices within the patch boundaries.
+        """
+        new_vertices = []
+        for idx, vertex in enumerate(vertices):
+            if idx % 2 == 0:  # x-coordinate
+                if vertex < j:
+                    new_vertices.append(0)
+                elif vertex > (j + patch_size):
+                    new_vertices.append(patch_size-1)
+                else:
+                    new_vertices.append(int(vertex - j))
+            else:  # y-coordinate
+                if vertex < i:
+                    new_vertices.append(0)
+                elif vertex > (i + patch_size):
+                    new_vertices.append(patch_size-1)
+                else:
+                    new_vertices.append(int(vertex - i))
+        
+        new_vertices = np.array(new_vertices).reshape(-1, 2)
+        _, idx = np.unique(new_vertices, axis=0, return_index=True)
+        return new_vertices[np.sort(idx)].tolist()
+
+    def _create_patch_annotation(self, new_rows:list, columns:pd.Index, annotation_path:str, patch_counter:int)->None:
+        """
+        Create and save a new annotation file for a patch.
+
+        :param new_rows: List of rows to include in the patch annotation.
+        :param columns: The columns of the original DataFrame.
+        :param annotation_path: Path to the original annotation file.
+        :param patch_counter: Index for the current patch.
+        """
+        if new_rows:
+            temp_df = pd.DataFrame(new_rows, columns=columns)
+            annotation_name = os.path.basename(annotation_path).split(".")[0]
+            path = f'{self.output_dir}/ann/{annotation_name}_{str(patch_counter)}.csv'
+            temp_df.to_csv(path, index=False)
 
 
-    def _check_range(self, arr, min_value, max_value):
-        """Check if any values in the list are in the range of min and max.
-        :param arr: array of values.
-        :param min_value: minimum value.
-        :param max_value: maximum value.
+    def _check_range(self, arr:np.ndarray, min_value:int, max_value:int)->bool:
+        """
+        Check if any values in the array are in the range of min and max.
 
-        :return: True if any values is in the range, False otherwise.
+        :param arr: NumPy array of values.
+        :param min_value: Minimum value of the range.
+        :param max_value: Maximum value of the range.
+        :return: True if any values are in the range, False otherwise.
         """
         required_values = np.arange(min_value, max_value)
         
         # check if any of required values are in the array
         return bool(np.any(np.isin(arr, required_values)))
 
-    def _create_directories(self, output_dir):
-        """Create the output directories.
-        :param output_dir: path to the output directory.
+    def _create_directories(self, output_dir:str)->None:
+        """
+        Create the output directories if they don't already exist.
+
+        :param output_dir: Path to the output directory.
         """
         # create output directory if not exists
         if not os.path.exists(output_dir):
