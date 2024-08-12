@@ -1,3 +1,9 @@
 .venv/
 backup/
+spa_input/
+spa_output/
+full.ipynb
 *.pyc
+*.png
+*.csv
+*.txt
