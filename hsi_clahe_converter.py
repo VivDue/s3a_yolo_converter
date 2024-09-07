@@ -39,9 +39,6 @@ class HsiClaheConverter:
                 # apply CLAHE to the intensity channel
                 img1[:, :, 1] = cv2.createCLAHE(clipLimit=self.precision, tileGridSize=(8, 8)).apply(img1[:, :, 1])
                 
-                # convert the image back to BGR
-                #img2 = cv2.cvtColor(img1, cv2.COLOR_HLS2BGR)
-                
                 # save the image
                 cv2.imwrite(self.output_dir + "/" + image_name, img1)
                 
