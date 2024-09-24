@@ -6,76 +6,76 @@ This project is designed to convert the proprietary S3A format used for the FPIC
 
 The project consists of three main components:
 
-1. **Image Patching:** Images are divided into equally sized patches to facilitate processing and training of neural networks.
+1. **Image Patching:** Images and annotations are divided into equally sized patches to facilitate processing and training of neural networks.
 2. **Data Conversion:** The patched images and corresponding annotations are converted from the S3A format to the YOLOv8 format.
 3. **Data Splitting:** The converted data is split into training, validation, and test datasets.
 
-## Project Structure
+Additionaly the project provides following three sub components:
 
-The project includes the following files and directories:
+1. **HSI + Clahe Conversion:**
+Images are converted from RGB to HSI and CLAHE contrast adjustment is applied.
+2. **Designator Copying:**
+Copy Designators from an existing annotation file to a target annotation file.
+3. **Designator Replacement:**
+Replace existing Designators from annotation files with newly specified Designators.
 
-- **`spa_converter.py`**: Contains the logic for converting S3A format to YOLOv8 format.
-- **`data_spliter.py`**: Splits the converted data into training, validation, and test datasets.
-- **`spa_patch_creator.py`**: Creates patches from the original images and their associated annotations.
-- **`example.ipynb`**: A Jupyter notebook that demonstrates how to use the scripts in a typical workflow pipeline.
-- **`requirements.txt`**: A list of Python libraries required for the project.
-- **`spa_sample_input/`**: A directory containing sample images and annotations in S3A format, which can be used as input for the scripts.
 
 ## Installation
 
-To set up the project on your local system, follow these steps:
+To install Automated_PCB_based_Circuit_Reconstruction and its dependencies, follow these steps:
 
-1. **Clone the repository:**
-   ```bash
-   git clone <your_repository_url>
-   cd <your_directory>
-   ```
+1. Clone the repository to your local machine:
 
-2. **Create a virtual environment (optional but recommended):**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   venv\Scripts\activate  # Windows
-   ```
+    ```bash
+    git clone https://github.com/VivDue/s3a_yolo_converter.git
+    ```
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. Navigate to the cloned directory and replace your path with your save path:
 
-## Usage
+    ```bash
+    cd your_path/Automated_PCB_based_Circuit_Reconstruction
+    ```
 
-### 1. Image Patching
+3. Create a virtual environment (optional but recommended):
 
-To split images into patches, use the `spa_patch_creator.py` script:
+    ```bash
+    python -m venv .venv
+    ```
 
-```bash
-python spa_patch_creator.py --ann_dir <path_to_annotations> --img_dir <path_to_images> --output_dir <output_path> --patch_size <patch_size_in_pixels>
-```
+4. Activate the virtual environment:
 
-### 2. Data Conversion
+    - **Windows:**
 
-Use the `spa_converter.py` script to convert the patches and annotation data into YOLOv8 format:
+    ```bash
+    .venv\Scripts\activate.bat
+    ```
 
-```bash
-python spa_converter.py --input_dir <path_to_patches> --output_dir <output_path>
-```
+    - **Linux/macOS:**
 
-### 3. Data Splitting
+    ```bash
+    source .venv/bin/activate
+    ```
 
-Finally, use the `data_spliter.py` script to divide the converted data into training, validation, and test datasets:
+5. Install the required dependencies and replace the your_path with your save path:
 
-```bash
-python data_spliter.py --input_dir <path_to_converted_data> --output_dir <output_path> --split_ratio <train_val_test_split_ratio>
-```
+    - `Using` requirements.txt:
+    ```bash
+    python -m pip install --upgrade pip
+    python -m pip install -r your_path/requirements.txt
+    ```
 
-### Example Workflow
+    - `Alternatively`, install packages individually:
+    If the requirements.txt installation fails, you can install the necessary packages manually:
+    ```bash
+    python -m pip install opencv-python
+    python -m pip install scikit-learn
+    python -m pip install tqdm
+    python -m pip install ipykernel
+    ```
+
+## Example Workflow
 
 A complete workflow pipeline example can be found in `example.ipynb`. This notebook provides step-by-step instructions on how to use the scripts.
-
-## Contributing
-
-Contributions are welcome! Please open an issue to report bugs or suggest new features, or submit a pull request directly.
 
 ## License
 
